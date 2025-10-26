@@ -1,9 +1,8 @@
--- TRAINING MULTIPLIER - WORKING VERSION
--- Berdasarkan remote calls yang REAL dari game
+-- TRAINING MULTIPLIER - REAL WORKING VERSION
+-- Fokus multiply nilai yang DITERIMA dari training
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -12,34 +11,18 @@ local playerGui = player:WaitForChild("PlayerGui")
 local Config = {
     Enabled = false,
     AutoTrain = false,
-    Multiplier = 100000,  -- Default 100K
-    TrainDelay = 0.5
+    Multiplier = 100000,  -- 100K default
+    TrainDelay = 0.3
 }
 
 local Stats = {
     Trains = 0,
-    LastCP = 0
+    TotalAdded = 0
 }
 
--- REMOTES (EXACT dari game Anda)
-local TrainEquipment = ReplicatedStorage:WaitForChild("TrainEquipment")
+-- REMOTES
 local TrainSystem = ReplicatedStorage:WaitForChild("TrainSystem")
-
-local Remotes = {
-    -- Remote Functions untuk training
-    ApplyStationaryTrain = TrainEquipment.Remote:WaitForChild("ApplyStationaryTrain"),
-    ApplyMobileTrain = TrainEquipment.Remote:WaitForChild("ApplyMobileTrain"),
-    ApplyBindingTrainingEffect = TrainEquipment.Remote:WaitForChild("ApplyBindingTrainingEffect"),
-    ApplyBindingTrainingBoostEffect = TrainEquipment.Remote:WaitForChild("ApplyBindingTrainingBoostEffect"),
-    
-    -- Bindable untuk local
-    ApplyStationaryTrainBindable = TrainEquipment.Bindable:WaitForChild("ApplyStationaryTrain"),
-    ApplyBindingTrainingEffectBindable = TrainEquipment.Bindable:WaitForChild("ApplyBindingTrainingEffect"),
-    
-    -- Events yang menerima perubahan
-    PlayerTrainValueHasChanged = TrainSystem.Bindable:WaitForChild("PlayerTrainValueHasChanged"),
-    PlayerCombatPowerHasChanged = TrainSystem.Bindable:WaitForChild("PlayerCombatPowerHasChanged"),
-}
+local TrainEquipment = ReplicatedStorage:WaitForChild("TrainEquipment")
 
 -- GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -48,8 +31,8 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = playerGui
 
 local Frame = Instance.new("Frame")
-Frame.Size = UDim2.new(0, 350, 0, 400)
-Frame.Position = UDim2.new(0.5, -175, 0.5, -200)
+Frame.Size = UDim2.new(0, 340, 0, 420)
+Frame.Position = UDim2.new(0.5, -170, 0.5, -210)
 Frame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 Frame.BorderSizePixel = 0
 Frame.Active = true
@@ -115,7 +98,7 @@ local CCorner = Instance.new("UICorner")
 CCorner.CornerRadius = UDim.new(0, 8)
 CCorner.Parent = CloseBtn
 
--- Status
+-- Status Display
 local StatusLbl = Instance.new("TextLabel")
 StatusLbl.Size = UDim2.new(1, -30, 0, 30)
 StatusLbl.Position = UDim2.new(0, 15, 0, 60)
@@ -138,21 +121,33 @@ TrainLbl.Font = Enum.Font.Gotham
 TrainLbl.TextXAlignment = Enum.TextXAlignment.Left
 TrainLbl.Parent = Frame
 
-local CPLbl = Instance.new("TextLabel")
-CPLbl.Size = UDim2.new(1, -30, 0, 25)
-CPLbl.Position = UDim2.new(0, 15, 0, 125)
-CPLbl.BackgroundTransparency = 1
-CPLbl.Text = "💎 CP: 0"
-CPLbl.TextColor3 = Color3.fromRGB(255, 200, 100)
-CPLbl.TextSize = 14
-CPLbl.Font = Enum.Font.Gotham
-CPLbl.TextXAlignment = Enum.TextXAlignment.Left
-CPLbl.Parent = Frame
+local AddedLbl = Instance.new("TextLabel")
+AddedLbl.Size = UDim2.new(1, -30, 0, 25)
+AddedLbl.Position = UDim2.new(0, 15, 0, 125)
+AddedLbl.BackgroundTransparency = 1
+AddedLbl.Text = "💎 Total Added: 0"
+AddedLbl.TextColor3 = Color3.fromRGB(255, 200, 100)
+AddedLbl.TextSize = 14
+AddedLbl.Font = Enum.Font.Gotham
+AddedLbl.TextXAlignment = Enum.TextXAlignment.Left
+AddedLbl.Parent = Frame
+
+local InfoLbl = Instance.new("TextLabel")
+InfoLbl.Size = UDim2.new(1, -30, 0, 40)
+InfoLbl.Position = UDim2.new(0, 15, 0, 155)
+InfoLbl.BackgroundTransparency = 1
+InfoLbl.Text = "ℹ️ Hook akan multiply nilai\nyang diterima saat training"
+InfoLbl.TextColor3 = Color3.fromRGB(150, 150, 200)
+InfoLbl.TextSize = 12
+InfoLbl.Font = Enum.Font.Gotham
+InfoLbl.TextXAlignment = Enum.TextXAlignment.Left
+InfoLbl.TextYAlignment = Enum.TextYAlignment.Top
+InfoLbl.Parent = Frame
 
 -- Multiplier Input
 local MultTitle = Instance.new("TextLabel")
 MultTitle.Size = UDim2.new(1, -30, 0, 25)
-MultTitle.Position = UDim2.new(0, 15, 0, 165)
+MultTitle.Position = UDim2.new(0, 15, 0, 205)
 MultTitle.BackgroundTransparency = 1
 MultTitle.Text = "🔥 Multiplier"
 MultTitle.TextColor3 = Color3.fromRGB(255, 150, 100)
@@ -163,11 +158,11 @@ MultTitle.Parent = Frame
 
 local MultInput = Instance.new("TextBox")
 MultInput.Size = UDim2.new(1, -30, 0, 45)
-MultInput.Position = UDim2.new(0, 15, 0, 195)
+MultInput.Position = UDim2.new(0, 15, 0, 235)
 MultInput.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 MultInput.BorderSizePixel = 0
 MultInput.Text = tostring(Config.Multiplier)
-MultInput.PlaceholderText = "100000"
+MultInput.PlaceholderText = "Contoh: 100000"
 MultInput.TextColor3 = Color3.fromRGB(255, 255, 0)
 MultInput.TextSize = 20
 MultInput.Font = Enum.Font.GothamBold
@@ -180,7 +175,7 @@ MICorner.Parent = MultInput
 -- Activate Button
 local ActivateBtn = Instance.new("TextButton")
 ActivateBtn.Size = UDim2.new(1, -30, 0, 50)
-ActivateBtn.Position = UDim2.new(0, 15, 0, 255)
+ActivateBtn.Position = UDim2.new(0, 15, 0, 295)
 ActivateBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
 ActivateBtn.Text = "🚀 ACTIVATE"
 ActivateBtn.TextSize = 18
@@ -196,7 +191,7 @@ ABCorner.Parent = ActivateBtn
 -- Auto Train Button
 local AutoBtn = Instance.new("TextButton")
 AutoBtn.Size = UDim2.new(1, -30, 0, 50)
-AutoBtn.Position = UDim2.new(0, 15, 0, 315)
+AutoBtn.Position = UDim2.new(0, 15, 0, 355)
 AutoBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
 AutoBtn.Text = "🤖 AUTO TRAIN: OFF"
 AutoBtn.TextSize = 16
@@ -209,7 +204,7 @@ local ATCorner = Instance.new("UICorner")
 ATCorner.CornerRadius = UDim.new(0, 10)
 ATCorner.Parent = AutoBtn
 
--- Minimized
+-- Minimized Frame
 local MinFrame = Instance.new("Frame")
 MinFrame.Size = UDim2.new(0, 250, 0, 45)
 MinFrame.Position = UDim2.new(0.5, -125, 0, 20)
@@ -278,10 +273,55 @@ end
 
 local function UpdateDisplay()
     TrainLbl.Text = "🎯 Trains: " .. Fmt(Stats.Trains)
-    CPLbl.Text = "💎 CP: " .. Fmt(Stats.LastCP)
+    AddedLbl.Text = "💎 Total Added: " .. Fmt(Stats.TotalAdded)
 end
 
--- HOOK SYSTEM - Ini yang PENTING!
+-- HOOK BINDABLE EVENT - INI YANG PENTING!
+-- Hook PlayerTrainValueHasChanged untuk multiply nilai yang diterima
+local trainBindable = TrainSystem.Bindable:WaitForChild("PlayerTrainValueHasChanged")
+
+local oldFire = trainBindable.Fire
+trainBindable.Fire = function(self, plr, trainType, newValue, oldValue)
+    if Config.Enabled and plr == player then
+        -- Hitung gain asli
+        local originalGain = newValue - oldValue
+        
+        -- Multiply gain
+        local multipliedGain = originalGain * Config.Multiplier
+        
+        -- Buat nilai baru yang sudah di-multiply
+        local finalNewValue = oldValue + multipliedGain
+        
+        Stats.TotalAdded = Stats.TotalAdded + multipliedGain
+        
+        print(string.format("🔥 Train Type %d: +%s (Original: +%s, Mult: x%s)", 
+            trainType, Fmt(multipliedGain), Fmt(originalGain), Fmt(Config.Multiplier)))
+        
+        -- Fire dengan nilai yang sudah di-multiply
+        return oldFire(self, plr, trainType, finalNewValue, oldValue)
+    end
+    
+    return oldFire(self, plr, trainType, newValue, oldValue)
+end
+
+-- Hook CombatPowerHasChanged juga
+local cpBindable = TrainSystem.Bindable:WaitForChild("PlayerCombatPowerHasChanged")
+
+local oldCPFire = cpBindable.Fire
+cpBindable.Fire = function(self, plr, combatPower)
+    if Config.Enabled and plr == player then
+        -- Multiply combat power juga
+        local multipliedCP = combatPower * Config.Multiplier
+        
+        print(string.format("💎 Combat Power: %s → %s", Fmt(combatPower), Fmt(multipliedCP)))
+        
+        return oldCPFire(self, plr, multipliedCP)
+    end
+    
+    return oldCPFire(self, plr, combatPower)
+end
+
+-- Hook __namecall untuk multiply returns dari server
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
@@ -291,84 +331,81 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         return oldNamecall(self, ...)
     end
     
-    -- Hook InvokeServer untuk multiply INPUTS
-    if method == "InvokeServer" and Config.Enabled then
-        local remoteName = tostring(self)
+    -- Hook InvokeServer
+    if method == "InvokeServer" then
+        local results = {pcall(oldNamecall, self, ...)}
+        local success = table.remove(results, 1)
         
-        -- Jika ini remote training, multiply semua angka di args
-        if remoteName:find("Train") or remoteName:find("Apply") then
-            for i = 1, #args do
-                if type(args[i]) == "number" and args[i] > 0 and args[i] < 1e10 then
-                    args[i] = args[i] * Config.Multiplier
+        if success and Config.Enabled then
+            -- Multiply semua number returns
+            for i = 1, #results do
+                if type(results[i]) == "number" and results[i] > 0 and results[i] < 1e15 then
+                    local original = results[i]
+                    results[i] = results[i] * Config.Multiplier
+                    
+                    if results[i] > original then
+                        Stats.TotalAdded = Stats.TotalAdded + (results[i] - original)
+                    end
                 end
             end
         end
         
-        return oldNamecall(self, unpack(args))
-    end
-    
-    -- Hook Invoke untuk BindableFunction
-    if method == "Invoke" and Config.Enabled then
-        local results = {oldNamecall(self, ...)}
-        
-        -- Multiply returns dari BindableFunction
-        for i = 1, #results do
-            if type(results[i]) == "number" and results[i] > 0 and results[i] < 1e15 then
-                results[i] = results[i] * Config.Multiplier
-            end
+        if success then
+            return unpack(results)
         end
-        
-        return unpack(results)
     end
     
     return oldNamecall(self, ...)
 end)
 
--- Hook BindableEvents untuk multiply data
-Remotes.PlayerTrainValueHasChanged.Event:Connect(function(plr, trainType, newValue, oldValue)
-    if Config.Enabled and plr == player then
-        -- Fire ulang dengan nilai yang di-multiply
-        local multipliedNew = newValue * Config.Multiplier
-        local multipliedOld = oldValue * Config.Multiplier
-        
-        print(string.format("🔥 Train Value: %s → %s (x%s)", 
-            Fmt(oldValue), Fmt(multipliedNew), Fmt(Config.Multiplier)))
-    end
-end)
-
-Remotes.PlayerCombatPowerHasChanged.Event:Connect(function(plr, cp)
-    if plr == player then
-        Stats.LastCP = cp
-        UpdateDisplay()
-    end
-end)
-
--- AUTO TRAIN LOOP
+-- AUTO TRAIN
 task.spawn(function()
     while task.wait(Config.TrainDelay) do
         if Config.Enabled and Config.AutoTrain then
             pcall(function()
-                -- Training sequence berdasarkan remote calls yang REAL
+                local trainEquipRemote = TrainEquipment.Remote
                 
-                -- 1. Stationary Train
-                Remotes.ApplyStationaryTrain:InvokeServer()
-                task.wait(0.1)
+                -- Apply Stationary Train
+                local stationaryRemote = trainEquipRemote:FindFirstChild("ApplyStationaryTrain")
+                if stationaryRemote then
+                    stationaryRemote:InvokeServer()
+                end
                 
-                -- 2. Mobile Train  
-                Remotes.ApplyMobileTrain:InvokeServer()
-                task.wait(0.1)
+                task.wait(0.05)
                 
-                -- 3. Binding Training Effect
-                Remotes.ApplyBindingTrainingEffect:InvokeServer("Training_2001", "Emit_2")
-                task.wait(0.1)
+                -- Apply Mobile Train
+                local mobileRemote = trainEquipRemote:FindFirstChild("ApplyMobileTrain")
+                if mobileRemote then
+                    mobileRemote:InvokeServer()
+                end
                 
-                -- 4. Boost Effect
-                Remotes.ApplyBindingTrainingBoostEffect:InvokeServer()
+                task.wait(0.05)
+                
+                -- Apply Binding Training Effect
+                local bindingRemote = trainEquipRemote:FindFirstChild("ApplyBindingTrainingEffect")
+                if bindingRemote then
+                    bindingRemote:InvokeServer("Training_2001", "Emit_2")
+                end
+                
+                task.wait(0.05)
+                
+                -- Apply Boost Effect
+                local boostRemote = trainEquipRemote:FindFirstChild("ApplyBindingTrainingBoostEffect")
+                if boostRemote then
+                    boostRemote:InvokeServer()
+                end
                 
                 Stats.Trains = Stats.Trains + 1
                 UpdateDisplay()
             end)
         end
+    end
+end)
+
+-- Stats update
+task.spawn(function()
+    while task.wait(1) do
+        UpdateDisplay()
     end
 end)
 
@@ -394,6 +431,7 @@ MultInput.FocusLost:Connect(function()
     if val and val >= 1 and val <= 999999999 then
         Config.Multiplier = math.floor(val)
         MultInput.Text = tostring(Config.Multiplier)
+        print("✅ Multiplier set to: " .. Fmt(Config.Multiplier))
     else
         MultInput.Text = tostring(Config.Multiplier)
     end
@@ -405,10 +443,11 @@ ActivateBtn.MouseButton1Click:Connect(function()
     if Config.Enabled then
         ActivateBtn.BackgroundColor3 = Color3.fromRGB(50, 255, 100)
         ActivateBtn.Text = "✅ ACTIVE"
-        StatusLbl.Text = "🟢 Status: ACTIVE"
+        StatusLbl.Text = "🟢 Status: ACTIVE - Multiplying x" .. Fmt(Config.Multiplier)
         StatusLbl.TextColor3 = Color3.fromRGB(100, 255, 100)
         MinStatus.Text = "🟢 ON"
         MinStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
+        print("🔥 Hook ACTIVE - Multiplier: x" .. Fmt(Config.Multiplier))
     else
         ActivateBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
         ActivateBtn.Text = "🚀 ACTIVATE"
@@ -416,6 +455,7 @@ ActivateBtn.MouseButton1Click:Connect(function()
         StatusLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
         MinStatus.Text = "⚪ OFF"
         MinStatus.TextColor3 = Color3.fromRGB(200, 200, 200)
+        print("⚪ Hook DISABLED")
     end
 end)
 
@@ -425,20 +465,15 @@ AutoBtn.MouseButton1Click:Connect(function()
     if Config.AutoTrain then
         AutoBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
         AutoBtn.Text = "🤖 AUTO TRAIN: ON"
+        print("🤖 Auto Train ENABLED")
     else
         AutoBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
         AutoBtn.Text = "🤖 AUTO TRAIN: OFF"
-    end
-end)
-
--- Stats update loop
-task.spawn(function()
-    while task.wait(1) do
-        UpdateDisplay()
+        print("🤖 Auto Train DISABLED")
     end
 end)
 
 print("✅ Training Multiplier Loaded!")
-print("🎯 Set multiplier (default 100,000x)")
-print("🚀 Klik ACTIVATE lalu AUTO TRAIN")
-print("💎 Training akan otomatis dengan multiplier")
+print("📝 Set multiplier → ACTIVATE → AUTO TRAIN")
+print("💡 Hook akan multiply nilai training yang diterima")
+print("🔥 Default multiplier: 100,000x")
