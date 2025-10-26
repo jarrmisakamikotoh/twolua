@@ -1,353 +1,313 @@
--- Delta Combat Multiplier - MAXIMUM SPEED VERSION
--- Ultra fast training with parallel threads
+-- TRAINING MULTIPLIER - Ultra Stable Version
+-- Fokus pada peningkatan nilai training untuk Combat Power tinggi
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- Configuration
 local Config = {
-    TrainMultiplier = 10000000,    -- 10 MILLION default!
-    SpeedMultiplier = 100000,      -- 100K speed
-    ThreadCount = 50,              -- 50 parallel threads!
     Enabled = false,
     AutoTrain = false,
-    UltraMode = true,              -- Remove ALL delays
-    InstantTrain = true            -- Train on every frame
+    
+    -- Multipliers untuk setiap stat
+    ArmMultiplier = 1000000,      -- 1 Million default
+    LegMultiplier = 1000000,      -- 1 Million default  
+    BackMultiplier = 1000000,     -- 1 Million default
+    AgilityMultiplier = 1000000,  -- 1 Million default
+    
+    GlobalMultiplier = 1,         -- Multiplier tambahan untuk semua
+    
+    TrainSpeed = 0.1,             -- Delay antar training (detik)
 }
 
 local Stats = {
-    TrainCount = 0,
-    TrainsPerSecond = 0,
-    LastCombatPower = 0,
     TotalGains = 0,
-    StartTime = tick()
+    TrainCount = 0,
+    SessionTime = 0
 }
 
--- Cache
-local Cache = {}
-local ThreadPool = {}
+-- Cache untuk remotes
+local Remotes = {
+    ApplyStationaryTrain = nil,
+    ApplyMobileTrain = nil,
+    ApplyBindingTrainingEffect = nil,
+    ApplyBindingTrainingBoostEffect = nil,
+    TrainSpeedHasChanged = nil
+}
 
--- GUI Creation
+-- GUI Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "DeltaMaxSpeed"
+ScreenGui.Name = "TrainingMultiplier"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = playerGui
 
+-- Main Frame
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 480, 0, 580)
-MainFrame.Position = UDim2.new(0.5, -240, 0.5, -290)
-MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+MainFrame.Size = UDim2.new(0, 420, 0, 580)
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, -290)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
-local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(0, 16)
-Corner.Parent = MainFrame
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 12)
+MainCorner.Parent = MainFrame
 
-local Stroke = Instance.new("UIStroke")
-Stroke.Color = Color3.fromRGB(255, 0, 0)
-Stroke.Thickness = 4
-Stroke.Parent = MainFrame
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(100, 200, 255)
+MainStroke.Thickness = 2
+MainStroke.Parent = MainFrame
 
 -- Header
 local Header = Instance.new("Frame")
-Header.Size = UDim2.new(1, 0, 0, 65)
-Header.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+Header.Size = UDim2.new(1, 0, 0, 50)
+Header.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 Header.BorderSizePixel = 0
 Header.Parent = MainFrame
 
-local HCorner = Instance.new("UICorner")
-HCorner.CornerRadius = UDim.new(0, 16)
-HCorner.Parent = Header
-
-local Gradient = Instance.new("UIGradient")
-Gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 100, 0)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
-}
-Gradient.Parent = Header
+local HeaderCorner = Instance.new("UICorner")
+HeaderCorner.CornerRadius = UDim.new(0, 12)
+HeaderCorner.Parent = Header
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -110, 1, 0)
+Title.Size = UDim2.new(1, -100, 1, 0)
 Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "⚡ DELTA MAXIMUM SPEED"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 22
-Title.Font = Enum.Font.GothamBlack
+Title.Text = "⚡ TRAINING MULTIPLIER"
+Title.TextColor3 = Color3.fromRGB(100, 200, 255)
+Title.TextSize = 20
+Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = Header
 
+-- Minimize Button
 local MinBtn = Instance.new("TextButton")
-MinBtn.Size = UDim2.new(0, 42, 0, 42)
-MinBtn.Position = UDim2.new(1, -98, 0, 12)
-MinBtn.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
+MinBtn.Size = UDim2.new(0, 35, 0, 35)
+MinBtn.Position = UDim2.new(1, -80, 0, 7)
+MinBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
 MinBtn.Text = "−"
-MinBtn.TextSize = 32
-MinBtn.Font = Enum.Font.GothamBlack
-MinBtn.BorderSizePixel = 0
+MinBtn.TextSize = 24
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinBtn.Parent = Header
 
-local MCorner = Instance.new("UICorner")
-MCorner.CornerRadius = UDim.new(0, 10)
-MCorner.Parent = MinBtn
+local MinCorner = Instance.new("UICorner")
+MinCorner.CornerRadius = UDim.new(0, 8)
+MinCorner.Parent = MinBtn
 
+-- Close Button
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 42, 0, 42)
-CloseBtn.Position = UDim2.new(1, -52, 0, 12)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+CloseBtn.Size = UDim2.new(0, 35, 0, 35)
+CloseBtn.Position = UDim2.new(1, -40, 0, 7)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
 CloseBtn.Text = "✕"
-CloseBtn.TextSize = 24
-CloseBtn.Font = Enum.Font.GothamBlack
-CloseBtn.BorderSizePixel = 0
+CloseBtn.TextSize = 20
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.Parent = Header
 
-local CCorner = Instance.new("UICorner")
-CCorner.CornerRadius = UDim.new(0, 10)
-CCorner.Parent = CloseBtn
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 8)
+CloseCorner.Parent = CloseBtn
 
 -- Content
-local Content = Instance.new("Frame")
-Content.Size = UDim2.new(1, -30, 1, -80)
-Content.Position = UDim2.new(0, 15, 0, 73)
+local Content = Instance.new("ScrollingFrame")
+Content.Size = UDim2.new(1, -20, 1, -60)
+Content.Position = UDim2.new(0, 10, 0, 55)
 Content.BackgroundTransparency = 1
+Content.BorderSizePixel = 0
+Content.ScrollBarThickness = 6
+Content.CanvasSize = UDim2.new(0, 0, 0, 700)
 Content.Parent = MainFrame
 
 -- Stats Display
 local StatsFrame = Instance.new("Frame")
-StatsFrame.Size = UDim2.new(1, 0, 0, 170)
-StatsFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+StatsFrame.Size = UDim2.new(1, 0, 0, 100)
+StatsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 StatsFrame.BorderSizePixel = 0
 StatsFrame.Parent = Content
 
-local SCorner = Instance.new("UICorner")
-SCorner.CornerRadius = UDim.new(0, 12)
-SCorner.Parent = StatsFrame
+local StatsCorner = Instance.new("UICorner")
+StatsCorner.CornerRadius = UDim.new(0, 10)
+StatsCorner.Parent = StatsFrame
 
-local SStroke = Instance.new("UIStroke")
-SStroke.Color = Color3.fromRGB(255, 0, 0)
-SStroke.Thickness = 3
-SStroke.Parent = StatsFrame
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, -20, 0, 30)
+StatusLabel.Position = UDim2.new(0, 10, 0, 10)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "⚪ Status: Standby"
+StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+StatusLabel.TextSize = 16
+StatusLabel.Font = Enum.Font.GothamBold
+StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+StatusLabel.Parent = StatsFrame
 
-local StatsTitle = Instance.new("TextLabel")
-StatsTitle.Size = UDim2.new(1, -20, 0, 32)
-StatsTitle.Position = UDim2.new(0, 10, 0, 5)
-StatsTitle.BackgroundTransparency = 1
-StatsTitle.Text = "🔥 ULTRA SPEED MONITOR"
-StatsTitle.TextColor3 = Color3.fromRGB(255, 100, 100)
-StatsTitle.TextSize = 18
-StatsTitle.Font = Enum.Font.GothamBlack
-StatsTitle.TextXAlignment = Enum.TextXAlignment.Left
-StatsTitle.Parent = StatsFrame
+local GainsLabel = Instance.new("TextLabel")
+GainsLabel.Size = UDim2.new(1, -20, 0, 25)
+GainsLabel.Position = UDim2.new(0, 10, 0, 45)
+GainsLabel.BackgroundTransparency = 1
+GainsLabel.Text = "💎 Total Gains: 0"
+GainsLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+GainsLabel.TextSize = 14
+GainsLabel.Font = Enum.Font.Gotham
+GainsLabel.TextXAlignment = Enum.TextXAlignment.Left
+GainsLabel.Parent = StatsFrame
 
-local StatusLbl = Instance.new("TextLabel")
-StatusLbl.Size = UDim2.new(1, -20, 0, 26)
-StatusLbl.Position = UDim2.new(0, 10, 0, 40)
-StatusLbl.BackgroundTransparency = 1
-StatusLbl.Text = "⚪ STANDBY"
-StatusLbl.TextColor3 = Color3.fromRGB(200, 200, 255)
-StatusLbl.TextSize = 16
-StatusLbl.Font = Enum.Font.GothamBold
-StatusLbl.TextXAlignment = Enum.TextXAlignment.Left
-StatusLbl.Parent = StatsFrame
+local CountLabel = Instance.new("TextLabel")
+CountLabel.Size = UDim2.new(1, -20, 0, 25)
+CountLabel.Position = UDim2.new(0, 10, 0, 72)
+CountLabel.BackgroundTransparency = 1
+CountLabel.Text = "🎯 Trains: 0"
+CountLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
+CountLabel.TextSize = 14
+CountLabel.Font = Enum.Font.Gotham
+CountLabel.TextXAlignment = Enum.TextXAlignment.Left
+CountLabel.Parent = StatsFrame
 
-local function CreateStatLabel(text, yPos)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -20, 0, 22)
-    lbl.Position = UDim2.new(0, 10, 0, yPos)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(255, 255, 150)
-    lbl.TextSize = 14
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = StatsFrame
-    return lbl
+-- Function to create multiplier input
+local function CreateMultiplierInput(name, yPos, defaultValue, emoji)
+    local panel = Instance.new("Frame")
+    panel.Size = UDim2.new(1, 0, 0, 80)
+    panel.Position = UDim2.new(0, 0, 0, yPos)
+    panel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    panel.BorderSizePixel = 0
+    panel.Parent = Content
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = panel
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -20, 0, 30)
+    label.Position = UDim2.new(0, 10, 0, 8)
+    label.BackgroundTransparency = 1
+    label.Text = emoji .. " " .. name
+    label.TextColor3 = Color3.fromRGB(150, 200, 255)
+    label.TextSize = 16
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = panel
+    
+    local input = Instance.new("TextBox")
+    input.Size = UDim2.new(1, -20, 0, 35)
+    input.Position = UDim2.new(0, 10, 0, 40)
+    input.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    input.BorderSizePixel = 0
+    input.Text = tostring(defaultValue)
+    input.PlaceholderText = "Enter multiplier..."
+    input.TextColor3 = Color3.fromRGB(255, 255, 255)
+    input.TextSize = 16
+    input.Font = Enum.Font.Gotham
+    input.Parent = panel
+    
+    local inputCorner = Instance.new("UICorner")
+    inputCorner.CornerRadius = UDim.new(0, 8)
+    inputCorner.Parent = input
+    
+    return input
 end
 
-local TPSLbl = CreateStatLabel("⚡ Speed: 0/sec", 70)
-local TrainLbl = CreateStatLabel("🎯 Total: 0", 95)
-local CPLbl = CreateStatLabel("💎 CP: 0", 120)
-local GainLbl = CreateStatLabel("🔥 Gains: +0", 145)
+-- Create multiplier inputs
+local ArmInput = CreateMultiplierInput("Arm Multiplier", 110, Config.ArmMultiplier, "💪")
+local LegInput = CreateMultiplierInput("Leg Multiplier", 200, Config.LegMultiplier, "🦵")
+local BackInput = CreateMultiplierInput("Back Multiplier", 290, Config.BackMultiplier, "🔥")
+local AgilityInput = CreateMultiplierInput("Agility Multiplier", 380, Config.AgilityMultiplier, "⚡")
+local GlobalInput = CreateMultiplierInput("Global Multiplier", 470, Config.GlobalMultiplier, "🌟")
 
--- Multiplier Panel
-local MultFrame = Instance.new("Frame")
-MultFrame.Size = UDim2.new(1, 0, 0, 110)
-MultFrame.Position = UDim2.new(0, 0, 0, 180)
-MultFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-MultFrame.BorderSizePixel = 0
-MultFrame.Parent = Content
-
-local MultCorner = Instance.new("UICorner")
-MultCorner.CornerRadius = UDim.new(0, 12)
-MultCorner.Parent = MultFrame
-
-local MultStroke = Instance.new("UIStroke")
-MultStroke.Color = Color3.fromRGB(255, 0, 255)
-MultStroke.Thickness = 2
-MultStroke.Parent = MultFrame
-
-local MultTitle = Instance.new("TextLabel")
-MultTitle.Size = UDim2.new(1, -20, 0, 28)
-MultTitle.Position = UDim2.new(0, 10, 0, 5)
-MultTitle.BackgroundTransparency = 1
-MultTitle.Text = "🔥 MULTIPLIER: x10,000,000"
-MultTitle.TextColor3 = Color3.fromRGB(255, 0, 255)
-MultTitle.TextSize = 17
-MultTitle.Font = Enum.Font.GothamBlack
-MultTitle.TextXAlignment = Enum.TextXAlignment.Left
-MultTitle.Parent = MultFrame
-
-local MultInput = Instance.new("TextBox")
-MultInput.Size = UDim2.new(1, -20, 0, 55)
-MultInput.Position = UDim2.new(0, 10, 0, 38)
-MultInput.BackgroundColor3 = Color3.fromRGB(5, 5, 10)
-MultInput.BorderSizePixel = 0
-MultInput.Text = "10000000"
-MultInput.PlaceholderText = "Enter: 1-999999999999"
-MultInput.TextColor3 = Color3.fromRGB(255, 255, 0)
-MultInput.TextSize = 28
-MultInput.Font = Enum.Font.GothamBlack
-MultInput.Parent = MultFrame
-
-local MICorner = Instance.new("UICorner")
-MICorner.CornerRadius = UDim.new(0, 10)
-MICorner.Parent = MultInput
-
-local MIStroke = Instance.new("UIStroke")
-MIStroke.Color = Color3.fromRGB(255, 255, 0)
-MIStroke.Thickness = 3
-MIStroke.Parent = MultInput
-
--- Thread Panel
-local ThreadFrame = Instance.new("Frame")
-ThreadFrame.Size = UDim2.new(1, 0, 0, 110)
-ThreadFrame.Position = UDim2.new(0, 0, 0, 300)
-ThreadFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-ThreadFrame.BorderSizePixel = 0
-ThreadFrame.Parent = Content
-
-local ThreadCorner = Instance.new("UICorner")
-ThreadCorner.CornerRadius = UDim.new(0, 12)
-ThreadCorner.Parent = ThreadFrame
-
-local ThreadStroke = Instance.new("UIStroke")
-ThreadStroke.Color = Color3.fromRGB(0, 200, 255)
-ThreadStroke.Thickness = 2
-ThreadStroke.Parent = ThreadFrame
-
-local ThreadTitle = Instance.new("TextLabel")
-ThreadTitle.Size = UDim2.new(1, -20, 0, 28)
-ThreadTitle.Position = UDim2.new(0, 10, 0, 5)
-ThreadTitle.BackgroundTransparency = 1
-ThreadTitle.Text = "🔥 THREADS: 50"
-ThreadTitle.TextColor3 = Color3.fromRGB(0, 200, 255)
-ThreadTitle.TextSize = 17
-ThreadTitle.Font = Enum.Font.GothamBlack
-ThreadTitle.TextXAlignment = Enum.TextXAlignment.Left
-ThreadTitle.Parent = ThreadFrame
-
-local ThreadInput = Instance.new("TextBox")
-ThreadInput.Size = UDim2.new(1, -20, 0, 55)
-ThreadInput.Position = UDim2.new(0, 10, 0, 38)
-ThreadInput.BackgroundColor3 = Color3.fromRGB(5, 5, 10)
-ThreadInput.BorderSizePixel = 0
-ThreadInput.Text = "50"
-ThreadInput.PlaceholderText = "1-100 threads"
-ThreadInput.TextColor3 = Color3.fromRGB(0, 255, 255)
-ThreadInput.TextSize = 28
-ThreadInput.Font = Enum.Font.GothamBlack
-ThreadInput.Parent = ThreadFrame
-
-local TICorner = Instance.new("UICorner")
-TICorner.CornerRadius = UDim.new(0, 10)
-TICorner.Parent = ThreadInput
-
--- Activate Button
+-- Control Buttons
 local ActivateBtn = Instance.new("TextButton")
-ActivateBtn.Size = UDim2.new(1, 0, 0, 58)
-ActivateBtn.Position = UDim2.new(0, 0, 0, 420)
-ActivateBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-ActivateBtn.Text = "🚀 ACTIVATE MAXIMUM SPEED"
-ActivateBtn.TextSize = 20
-ActivateBtn.Font = Enum.Font.GothamBlack
-ActivateBtn.BorderSizePixel = 0
+ActivateBtn.Size = UDim2.new(1, 0, 0, 50)
+ActivateBtn.Position = UDim2.new(0, 0, 0, 560)
+ActivateBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+ActivateBtn.Text = "🚀 ACTIVATE"
+ActivateBtn.TextSize = 18
+ActivateBtn.Font = Enum.Font.GothamBold
+ActivateBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ActivateBtn.Parent = Content
 
-local ActCorner = Instance.new("UICorner")
-ActCorner.CornerRadius = UDim.new(0, 12)
-ActCorner.Parent = ActivateBtn
+local ActivateCorner = Instance.new("UICorner")
+ActivateCorner.CornerRadius = UDim.new(0, 10)
+ActivateCorner.Parent = ActivateBtn
 
-local ActStroke = Instance.new("UIStroke")
-ActStroke.Color = Color3.fromRGB(0, 255, 150)
-ActStroke.Thickness = 4
-ActStroke.Parent = ActivateBtn
+local AutoBtn = Instance.new("TextButton")
+AutoBtn.Size = UDim2.new(1, 0, 0, 45)
+AutoBtn.Position = UDim2.new(0, 0, 0, 620)
+AutoBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+AutoBtn.Text = "🤖 AUTO TRAIN: OFF"
+AutoBtn.TextSize = 16
+AutoBtn.Font = Enum.Font.GothamBold
+AutoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoBtn.Parent = Content
+
+local AutoCorner = Instance.new("UICorner")
+AutoCorner.CornerRadius = UDim.new(0, 10)
+AutoCorner.Parent = AutoBtn
 
 -- Minimized Frame
 local MinFrame = Instance.new("Frame")
-MinFrame.Size = UDim2.new(0, 320, 0, 60)
-MinFrame.Position = UDim2.new(0.5, -160, 0, 20)
-MinFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+MinFrame.Size = UDim2.new(0, 280, 0, 50)
+MinFrame.Position = UDim2.new(0.5, -140, 0, 20)
+MinFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MinFrame.BorderSizePixel = 0
 MinFrame.Visible = false
 MinFrame.Active = true
 MinFrame.Draggable = true
 MinFrame.Parent = ScreenGui
 
-local MFCorner = Instance.new("UICorner")
-MFCorner.CornerRadius = UDim.new(0, 14)
-MFCorner.Parent = MinFrame
+local MinFrameCorner = Instance.new("UICorner")
+MinFrameCorner.CornerRadius = UDim.new(0, 10)
+MinFrameCorner.Parent = MinFrame
 
-local MFStroke = Instance.new("UIStroke")
-MFStroke.Color = Color3.fromRGB(255, 0, 0)
-MFStroke.Thickness = 3
-MFStroke.Parent = MinFrame
+local MinFrameStroke = Instance.new("UIStroke")
+MinFrameStroke.Color = Color3.fromRGB(100, 200, 255)
+MinFrameStroke.Thickness = 2
+MinFrameStroke.Parent = MinFrame
 
 local MinLabel = Instance.new("TextLabel")
-MinLabel.Size = UDim2.new(1, -70, 1, 0)
+MinLabel.Size = UDim2.new(1, -100, 1, 0)
 MinLabel.Position = UDim2.new(0, 15, 0, 0)
 MinLabel.BackgroundTransparency = 1
-MinLabel.Text = "⚡ DELTA ULTRA"
-MinLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-MinLabel.TextSize = 20
-MinLabel.Font = Enum.Font.GothamBlack
+MinLabel.Text = "⚡ Training"
+MinLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+MinLabel.TextSize = 16
+MinLabel.Font = Enum.Font.GothamBold
 MinLabel.TextXAlignment = Enum.TextXAlignment.Left
 MinLabel.Parent = MinFrame
 
-local MinStatusLbl = Instance.new("TextLabel")
-MinStatusLbl.Size = UDim2.new(0, 65, 1, 0)
-MinStatusLbl.Position = UDim2.new(1, -125, 0, 0)
-MinStatusLbl.BackgroundTransparency = 1
-MinStatusLbl.Text = "⚪ OFF"
-MinStatusLbl.TextColor3 = Color3.fromRGB(255, 100, 100)
-MinStatusLbl.TextSize = 14
-MinStatusLbl.Font = Enum.Font.GothamBold
-MinStatusLbl.Parent = MinFrame
+local MinStatus = Instance.new("TextLabel")
+MinStatus.Size = UDim2.new(0, 80, 1, 0)
+MinStatus.Position = UDim2.new(1, -150, 0, 0)
+MinStatus.BackgroundTransparency = 1
+MinStatus.Text = "⚪ OFF"
+MinStatus.TextColor3 = Color3.fromRGB(200, 200, 200)
+MinStatus.TextSize = 14
+MinStatus.Font = Enum.Font.GothamBold
+MinStatus.Parent = MinFrame
 
 local RestoreBtn = Instance.new("TextButton")
-RestoreBtn.Size = UDim2.new(0, 50, 0, 50)
-RestoreBtn.Position = UDim2.new(1, -55, 0, 5)
-RestoreBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+RestoreBtn.Size = UDim2.new(0, 40, 0, 40)
+RestoreBtn.Position = UDim2.new(1, -45, 0, 5)
+RestoreBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
 RestoreBtn.Text = "□"
-RestoreBtn.TextSize = 24
-RestoreBtn.Font = Enum.Font.GothamBlack
-RestoreBtn.BorderSizePixel = 0
+RestoreBtn.TextSize = 20
+RestoreBtn.Font = Enum.Font.GothamBold
+RestoreBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 RestoreBtn.Parent = MinFrame
 
-local RCorner = Instance.new("UICorner")
-RCorner.CornerRadius = UDim.new(0, 10)
-RCorner.Parent = RestoreBtn
+local RestoreCorner = Instance.new("UICorner")
+RestoreCorner.CornerRadius = UDim.new(0, 8)
+RestoreCorner.Parent = RestoreBtn
 
--- Format number
+-- Helper Functions
 local function FormatNumber(num)
-    if num >= 1e21 then return string.format("%.2fSx", num / 1e21)
-    elseif num >= 1e18 then return string.format("%.2fQu", num / 1e18)
+    if num >= 1e18 then return string.format("%.2fQu", num / 1e18)
     elseif num >= 1e15 then return string.format("%.2fQd", num / 1e15)
     elseif num >= 1e12 then return string.format("%.2fT", num / 1e12)
     elseif num >= 1e9 then return string.format("%.2fB", num / 1e9)
@@ -356,48 +316,139 @@ local function FormatNumber(num)
     else return tostring(math.floor(num)) end
 end
 
--- Update Stats
-local lastTrainCount = 0
 local function UpdateStats()
-    local currentTime = tick()
-    local elapsed = currentTime - Stats.StartTime
-    
-    if elapsed >= 1 then
-        Stats.TrainsPerSecond = Stats.TrainCount - lastTrainCount
-        lastTrainCount = Stats.TrainCount
-        Stats.StartTime = currentTime
-    end
-    
-    MultTitle.Text = string.format("🔥 MULTIPLIER: x%s", FormatNumber(Config.TrainMultiplier))
-    ThreadTitle.Text = string.format("🔥 THREADS: %d", Config.ThreadCount)
-    TPSLbl.Text = string.format("⚡ Speed: %s/sec", FormatNumber(Stats.TrainsPerSecond))
-    TrainLbl.Text = string.format("🎯 Total: %s", FormatNumber(Stats.TrainCount))
-    CPLbl.Text = string.format("💎 CP: %s", FormatNumber(Stats.LastCombatPower))
-    GainLbl.Text = string.format("🔥 Gains: +%s", FormatNumber(Stats.TotalGains))
+    GainsLabel.Text = "💎 Total Gains: " .. FormatNumber(Stats.TotalGains)
+    CountLabel.Text = "🎯 Trains: " .. FormatNumber(Stats.TrainCount)
 end
 
--- Input handlers
-MultInput.FocusLost:Connect(function()
-    local v = tonumber(MultInput.Text)
-    if v and v >= 1 and v <= 999999999999 then
-        Config.TrainMultiplier = math.floor(v)
-        UpdateStats()
+local function UpdateInputs()
+    local arm = tonumber(ArmInput.Text)
+    local leg = tonumber(LegInput.Text)
+    local back = tonumber(BackInput.Text)
+    local agility = tonumber(AgilityInput.Text)
+    local global = tonumber(GlobalInput.Text)
+    
+    if arm and arm >= 1 then Config.ArmMultiplier = math.floor(arm) end
+    if leg and leg >= 1 then Config.LegMultiplier = math.floor(leg) end
+    if back and back >= 1 then Config.BackMultiplier = math.floor(back) end
+    if agility and agility >= 1 then Config.AgilityMultiplier = math.floor(agility) end
+    if global and global >= 1 then Config.GlobalMultiplier = math.floor(global) end
+end
+
+-- Cache remotes
+task.spawn(function()
+    local success, err = pcall(function()
+        local trainEquip = ReplicatedStorage:WaitForChild("TrainEquipment", 5)
+        if trainEquip then
+            local remote = trainEquip:FindFirstChild("Remote")
+            if remote then
+                Remotes.ApplyStationaryTrain = remote:FindFirstChild("ApplyStationaryTrain")
+                Remotes.ApplyMobileTrain = remote:FindFirstChild("ApplyMobileTrain")
+                Remotes.ApplyBindingTrainingEffect = remote:FindFirstChild("ApplyBindingTrainingEffect")
+                Remotes.ApplyBindingTrainingBoostEffect = remote:FindFirstChild("ApplyBindingTrainingBoostEffect")
+            end
+        end
+        
+        local trainSystem = ReplicatedStorage:WaitForChild("TrainSystem", 5)
+        if trainSystem then
+            local remote = trainSystem:FindFirstChild("Remote")
+            if remote then
+                Remotes.TrainSpeedHasChanged = remote:FindFirstChild("TrainSpeedHasChanged")
+            end
+        end
+    end)
+    
+    if success then
+        print("✅ Remotes cached successfully")
     else
-        MultInput.Text = tostring(Config.TrainMultiplier)
+        warn("⚠️ Failed to cache remotes:", err)
     end
 end)
 
-ThreadInput.FocusLost:Connect(function()
-    local v = tonumber(ThreadInput.Text)
-    if v and v >= 1 and v <= 100 then
-        Config.ThreadCount = math.floor(v)
-        UpdateStats()
-    else
-        ThreadInput.Text = tostring(Config.ThreadCount)
+-- Hook System untuk multiply returns
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if not Config.Enabled then
+        return oldNamecall(self, ...)
+    end
+    
+    if method == "InvokeServer" or method == "Invoke" then
+        local results = {pcall(oldNamecall, self, ...)}
+        local success = table.remove(results, 1)
+        
+        if success and Config.Enabled then
+            -- Multiply semua numeric returns
+            for i, result in ipairs(results) do
+                if type(result) == "number" and result > 0 and result < 1e15 then
+                    local multiplier = Config.GlobalMultiplier
+                    
+                    -- Tentukan multiplier berdasarkan nama remote
+                    if self.Name:find("Arm") or tostring(self):find("arm") then
+                        multiplier = multiplier * Config.ArmMultiplier
+                    elseif self.Name:find("Leg") or tostring(self):find("leg") then
+                        multiplier = multiplier * Config.LegMultiplier
+                    elseif self.Name:find("Back") or tostring(self):find("back") then
+                        multiplier = multiplier * Config.BackMultiplier
+                    elseif self.Name:find("Agility") or tostring(self):find("agility") then
+                        multiplier = multiplier * Config.AgilityMultiplier
+                    end
+                    
+                    local newValue = result * multiplier
+                    Stats.TotalGains = Stats.TotalGains + (newValue - result)
+                    results[i] = newValue
+                end
+            end
+        end
+        
+        if success then
+            return unpack(results)
+        end
+    end
+    
+    return oldNamecall(self, ...)
+end)
+
+-- Auto Training Loop
+task.spawn(function()
+    while task.wait(Config.TrainSpeed) do
+        if Config.Enabled and Config.AutoTrain then
+            pcall(function()
+                if Remotes.ApplyStationaryTrain then
+                    Remotes.ApplyStationaryTrain:InvokeServer()
+                end
+                
+                if Remotes.ApplyMobileTrain then
+                    Remotes.ApplyMobileTrain:InvokeServer()
+                end
+                
+                if Remotes.ApplyBindingTrainingEffect then
+                    Remotes.ApplyBindingTrainingEffect:InvokeServer("Training_2001", "Emit_2")
+                end
+                
+                if Remotes.ApplyBindingTrainingBoostEffect then
+                    Remotes.ApplyBindingTrainingBoostEffect:InvokeServer()
+                end
+                
+                Stats.TrainCount = Stats.TrainCount + 1
+            end)
+        end
     end
 end)
 
--- Button handlers
+-- Stats Update Loop
+task.spawn(function()
+    while task.wait(0.5) do
+        if Config.Enabled then
+            UpdateStats()
+            Stats.SessionTime = Stats.SessionTime + 0.5
+        end
+    end
+end)
+
+-- Button Events
 MinBtn.MouseButton1Click:Connect(function()
     MainFrame.Visible = false
     MinFrame.Visible = true
@@ -410,246 +461,51 @@ end)
 
 CloseBtn.MouseButton1Click:Connect(function()
     Config.Enabled = false
+    Config.AutoTrain = false
     ScreenGui:Destroy()
 end)
 
 ActivateBtn.MouseButton1Click:Connect(function()
+    UpdateInputs()
     Config.Enabled = not Config.Enabled
-    Config.AutoTrain = Config.Enabled
     
     if Config.Enabled then
-        ActivateBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-        ActivateBtn.Text = "⛔ STOP ULTRA MODE"
-        StatusLbl.Text = "🔥 ULTRA SPEED ACTIVE!"
-        StatusLbl.TextColor3 = Color3.fromRGB(255, 100, 0)
-        MinStatusLbl.Text = "🔥 ON"
-        MinStatusLbl.TextColor3 = Color3.fromRGB(255, 255, 0)
-        ActStroke.Color = Color3.fromRGB(255, 0, 0)
-        Stats.StartTime = tick()
-        lastTrainCount = 0
+        ActivateBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+        ActivateBtn.Text = "✅ ACTIVE"
+        StatusLabel.Text = "🟢 Status: Active"
+        StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        MinStatus.Text = "🟢 ON"
+        MinStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
     else
-        ActivateBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-        ActivateBtn.Text = "🚀 ACTIVATE MAXIMUM SPEED"
-        StatusLbl.Text = "⚪ STANDBY"
-        StatusLbl.TextColor3 = Color3.fromRGB(200, 200, 255)
-        MinStatusLbl.Text = "⚪ OFF"
-        MinStatusLbl.TextColor3 = Color3.fromRGB(255, 100, 100)
-        ActStroke.Color = Color3.fromRGB(0, 255, 150)
+        ActivateBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+        ActivateBtn.Text = "🚀 ACTIVATE"
+        StatusLabel.Text = "⚪ Status: Standby"
+        StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        MinStatus.Text = "⚪ OFF"
+        MinStatus.TextColor3 = Color3.fromRGB(200, 200, 200)
     end
 end)
 
--- Cache remotes
-task.spawn(function()
-    task.wait(1)
-    local TS = ReplicatedStorage:FindFirstChild("TrainSystem")
-    if TS then
-        local Remote = TS:FindFirstChild("Remote")
-        if Remote then
-            Cache.SpeedRemote = Remote:FindFirstChild("TrainSpeedHasChanged")
-        end
-        local Bindable = TS:FindFirstChild("Bindable")
-        if Bindable then
-            Cache.GetCombatPower = Bindable:FindFirstChild("GetCombatPower")
-        end
-    end
+AutoBtn.MouseButton1Click:Connect(function()
+    Config.AutoTrain = not Config.AutoTrain
     
-    local TE = ReplicatedStorage:FindFirstChild("TrainEquipment")
-    if TE then
-        local Remote = TE:FindFirstChild("Remote")
-        if Remote then
-            Cache.StationaryTrain = Remote:FindFirstChild("ApplyStationaryTrain")
-            Cache.MobileTrain = Remote:FindFirstChild("ApplyMobileTrain")
-            Cache.BindingEffect = Remote:FindFirstChild("ApplyBindingTrainingEffect")
-            Cache.BoostEffect = Remote:FindFirstChild("ApplyBindingTrainingBoostEffect")
-        end
+    if Config.AutoTrain then
+        AutoBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+        AutoBtn.Text = "🤖 AUTO TRAIN: ON"
+    else
+        AutoBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+        AutoBtn.Text = "🤖 AUTO TRAIN: OFF"
     end
-    
-    print("✅ Delta: Remotes cached - READY FOR ULTRA SPEED!")
 end)
 
--- Speed hook
-local function SetupSpeedHook()
-    local oldNamecall
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        if not Config.Enabled then
-            return oldNamecall(self, ...)
-        end
-        
-        local method = getnamecallmethod()
-        local args = {...}
-        
-        if method == "FireServer" and self.Name == "TrainSpeedHasChanged" then
-            if args[1] and typeof(args[1]) == "number" then
-                args[1] = args[1] * Config.SpeedMultiplier
-            end
-            return oldNamecall(self, unpack(args))
-        end
-        
-        return oldNamecall(self, ...)
+-- Input validation
+for _, input in pairs({ArmInput, LegInput, BackInput, AgilityInput, GlobalInput}) do
+    input.FocusLost:Connect(function()
+        UpdateInputs()
     end)
-    
-    print("✅ Delta: Speed hook ready")
 end
 
--- ULTRA TRAINING THREAD - NO DELAYS!
-local function UltraTrainingThread(threadID)
-    while true do
-        -- ZERO delay when ultra mode
-        local waitTime = Config.UltraMode and 0 or 0.001
-        if waitTime > 0 then task.wait(waitTime) end
-        
-        if Config.AutoTrain and Config.Enabled then
-            pcall(function()
-                -- Calculate iterations based on multiplier
-                local iterations = math.floor(Config.TrainMultiplier / 10000)
-                iterations = math.max(1, math.min(iterations, 200)) -- Max 200 per thread
-                
-                for i = 1, iterations do
-                    -- Train WITHOUT delays
-                    if Cache.StationaryTrain then
-                        Cache.StationaryTrain:InvokeServer()
-                    end
-                    
-                    if Cache.MobileTrain then
-                        Cache.MobileTrain:InvokeServer()
-                    end
-                    
-                    Stats.TrainCount = Stats.TrainCount + 1
-                    Stats.TotalGains = Stats.TotalGains + 100 -- Estimate
-                    
-                    -- NO wait between trains in ultra mode!
-                    if not Config.UltraMode then
-                        task.wait(0.001)
-                    end
-                end
-            end)
-        else
-            task.wait(0.1)
-        end
-    end
-end
-
--- Spawn multiple parallel threads
-task.spawn(function()
-    task.wait(3)
-    
-    for i = 1, Config.ThreadCount do
-        local thread = task.spawn(function()
-            UltraTrainingThread(i)
-        end)
-        table.insert(ThreadPool, thread)
-    end
-    
-    print(string.format("✅ Delta: Spawned %d ULTRA threads!", Config.ThreadCount))
-end)
-
--- CONTINUOUS speed spam - EVERY FRAME
-RunService.Heartbeat:Connect(function()
-    if Config.Enabled and Config.InstantTrain and Cache.SpeedRemote then
-        pcall(function()
-            Cache.SpeedRemote:FireServer(Config.SpeedMultiplier * 999)
-        end)
-    end
-end)
-
--- RenderStepped - EVEN FASTER!
-RunService.RenderStepped:Connect(function()
-    if Config.Enabled and Config.UltraMode and Cache.SpeedRemote then
-        pcall(function()
-            Cache.SpeedRemote:FireServer(Config.SpeedMultiplier * 9999)
-        end)
-    end
-end)
-
--- Apply effects spam
-task.spawn(function()
-    while true do
-        task.wait(Config.UltraMode and 0 or 0.05)
-        
-        if Config.Enabled then
-            pcall(function()
-                if Cache.BindingEffect then
-                    Cache.BindingEffect:InvokeServer("Training_2001", "Emit_2")
-                end
-                
-                if Cache.BoostEffect then
-                    Cache.BoostEffect:InvokeServer()
-                end
-            end)
-        end
-    end
-end)
-
--- Monitor combat power
-task.spawn(function()
-    while task.wait(0.5) do
-        if Config.Enabled and Cache.GetCombatPower then
-            pcall(function()
-                local cp = Cache.GetCombatPower:Invoke(player)
-                if cp and typeof(cp) == "number" then
-                    Stats.LastCombatPower = cp
-                end
-            end)
-        end
-        UpdateStats()
-    end
-end)
-
--- Visual effects
-task.spawn(function()
-    local rotation = 0
-    while task.wait(0.02) do
-        rotation = (rotation + 5) % 360
-        Gradient.Rotation = rotation
-        
-        if Config.Enabled then
-            Stroke.Color = Color3.fromRGB(
-                255,
-                math.floor(100 + 155 * math.sin(rotation * 0.1)),
-                math.floor(100 * math.cos(rotation * 0.15))
-            )
-        else
-            Stroke.Color = Color3.fromRGB(255, 0, 0)
-        end
-    end
-end)
-
--- Initialize
-SetupSpeedHook()
-UpdateStats()
-
-print("💥 ========================================================")
-print("💥 DELTA MAXIMUM SPEED - ULTRA VERSION LOADED!")
-print("💥 ========================================================")
-print("")
-print("🔥 ULTRA FEATURES:")
-print("   • 50 PARALLEL THREADS (default)")
-print("   • ZERO DELAYS in ultra mode")
-print("   • Heartbeat + RenderStepped hooks")
-print("   • 10 MILLION multiplier (default)")
-print("   • Up to 200 iterations per thread")
-print("")
-print("⚡ EXPECTED PERFORMANCE:")
-print("   • 50 threads × 200 iterations = 10,000 trains/cycle")
-print("   • Cycle time: ~0.1 seconds")
-print("   • Speed: 100,000+ trains/second!")
-print("   • With base +18 Arms = 1.8M Arms/second!")
-print("")
-print("📊 REACH GOALS:")
-print("   • 800M → 1B: ~30 seconds")
-print("   • 1B → 1T: ~10 minutes")
-print("   • 1T → 1Qd: ~2 hours")
-print("")
-print("💡 TIPS FOR MAXIMUM SPEED:")
-print("   • Keep multiplier at 10M-100M")
-print("   • Use 50-100 threads")
-print("   • Don't move character (less lag)")
-print("   • Close other GUI/scripts")
-print("")
-print("⚠️ ULTRA MODE:")
-print("   • NO wait() calls = MAXIMUM SPEED")
-print("   • May cause lag on slow devices")
-print("   • If game crashes, lower threads to 20-30")
-print("")
-print("✅ DELTA ULTRA READY - LET'S GO TO TRILLIONS!")
-print("💥 ========================================================")
+print("✅ Training Multiplier loaded!")
+print("💡 Set multipliers dan klik ACTIVATE")
+print("🎯 Default: 1,000,000x untuk setiap stat")
+print("🚀 Combat Power akan meningkat drastis!")
