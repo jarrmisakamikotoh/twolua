@@ -1,5 +1,5 @@
--- Extreme Combat Power Auto Trainer for Delta
--- GUI yang stabil dengan multiplier ekstrem untuk mencapai ratusan juta hingga triliun+ combat power
+-- Extreme Combat Power Auto Trainer V2 for Delta
+-- Fixed version dengan remote events yang benar
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,7 +8,7 @@ local LocalPlayer = Players.LocalPlayer
 
 -- UI Library Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ExtremeCombatTrainer"
+ScreenGui.Name = "ExtremeCombatTrainerV2"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
@@ -16,15 +16,14 @@ ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 -- Main Frame
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 420, 0, 480)
-MainFrame.Position = UDim2.new(0.5, -210, 0.5, -240)
+MainFrame.Size = UDim2.new(0, 420, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, -250)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
--- Corner Rounding
 local MainCorner = Instance.new("UICorner")
 MainCorner.CornerRadius = UDim.new(0, 10)
 MainCorner.Parent = MainFrame
@@ -45,16 +44,15 @@ local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Size = UDim2.new(1, -80, 1, 0)
 TitleLabel.Position = UDim2.new(0, 10, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "⚡ EXTREME COMBAT TRAINER"
+TitleLabel.Text = "⚡ EXTREME COMBAT TRAINER V2"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleLabel.TextSize = 16
+TitleLabel.TextSize = 15
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TitleLabel.Parent = TitleBar
 
 -- Minimize Button
 local MinimizeButton = Instance.new("TextButton")
-MinimizeButton.Name = "MinimizeButton"
 MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
 MinimizeButton.Position = UDim2.new(1, -65, 0, 2.5)
 MinimizeButton.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
@@ -70,7 +68,6 @@ MinCorner.Parent = MinimizeButton
 
 -- Close Button
 local CloseButton = Instance.new("TextButton")
-CloseButton.Name = "CloseButton"
 CloseButton.Size = UDim2.new(0, 30, 0, 30)
 CloseButton.Position = UDim2.new(1, -32, 0, 2.5)
 CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
@@ -86,7 +83,6 @@ CloseCorner.Parent = CloseButton
 
 -- Content Frame
 local ContentFrame = Instance.new("Frame")
-ContentFrame.Name = "ContentFrame"
 ContentFrame.Size = UDim2.new(1, -20, 1, -45)
 ContentFrame.Position = UDim2.new(0, 10, 0, 40)
 ContentFrame.BackgroundTransparency = 1
@@ -95,21 +91,20 @@ ContentFrame.Parent = MainFrame
 -- Config Variables
 local Config = {
     AutoTrain = false,
-    TrainSpeed = 0.1,
-    Multiplier = 1000000, -- 1 Million multiplier per train
+    TrainSpeed = 0.05,
+    Multiplier = 1000000,
     UseBuffItems = true,
     Elements = {
-        Arms = true,
-        Legs = true,
-        Back = true,
-        Agility = true
+        Arms = {enabled = true, itemId = 18},
+        Legs = {enabled = true, itemId = 20},
+        Back = {enabled = true, itemId = 19},
+        Agility = {enabled = true, itemId = 21}
     }
 }
 
 -- Stats Display
 local StatsFrame = Instance.new("Frame")
 StatsFrame.Size = UDim2.new(1, 0, 0, 80)
-StatsFrame.Position = UDim2.new(0, 0, 0, 0)
 StatsFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
 StatsFrame.BorderSizePixel = 0
 StatsFrame.Parent = ContentFrame
@@ -230,25 +225,29 @@ local ElementLabel = Instance.new("TextLabel")
 ElementLabel.Size = UDim2.new(1, 0, 0, 25)
 ElementLabel.Position = UDim2.new(0, 0, 0, 260)
 ElementLabel.BackgroundTransparency = 1
-ElementLabel.Text = "🎯 Train Elements:"
+ElementLabel.Text = "🎯 Train Elements (Item Buffs):"
 ElementLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-ElementLabel.TextSize = 14
+ElementLabel.TextSize = 13
 ElementLabel.Font = Enum.Font.GothamBold
 ElementLabel.TextXAlignment = Enum.TextXAlignment.Left
 ElementLabel.Parent = ContentFrame
 
 local ElementButtons = {}
-local elementNames = {"Arms 💪", "Legs 🦵", "Back 🛡️", "Agility ⚡"}
-local elementKeys = {"Arms", "Legs", "Back", "Agility"}
+local elementData = {
+    {name = "Arms 💪 (18)", key = "Arms"},
+    {name = "Legs 🦵 (20)", key = "Legs"},
+    {name = "Back 🛡️ (19)", key = "Back"},
+    {name = "Agility ⚡ (21)", key = "Agility"}
+}
 
-for i, name in ipairs(elementNames) do
+for i, data in ipairs(elementData) do
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0.48, 0, 0, 35)
     btn.Position = UDim2.new((i-1)%2 * 0.52, 0, 0, 290 + math.floor((i-1)/2) * 45)
     btn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
-    btn.Text = name
+    btn.Text = data.name
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 13
+    btn.TextSize = 12
     btn.Font = Enum.Font.GothamBold
     btn.Parent = ContentFrame
     
@@ -256,13 +255,13 @@ for i, name in ipairs(elementNames) do
     btnCorner.CornerRadius = UDim.new(0, 6)
     btnCorner.Parent = btn
     
-    ElementButtons[elementKeys[i]] = btn
+    ElementButtons[data.key] = btn
 end
 
 -- Status Label
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size = UDim2.new(1, 0, 0, 30)
-StatusLabel.Position = UDim2.new(0, 0, 1, -35)
+StatusLabel.Position = UDim2.new(0, 0, 1, -45)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Text = "⏸️ Status: Idle"
 StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
@@ -295,21 +294,21 @@ end)
 
 for key, btn in pairs(ElementButtons) do
     btn.MouseButton1Click:Connect(function()
-        Config.Elements[key] = not Config.Elements[key]
-        btn.BackgroundColor3 = Config.Elements[key] and Color3.fromRGB(0, 150, 100) or Color3.fromRGB(100, 50, 50)
+        Config.Elements[key].enabled = not Config.Elements[key].enabled
+        btn.BackgroundColor3 = Config.Elements[key].enabled and Color3.fromRGB(0, 150, 100) or Color3.fromRGB(100, 50, 50)
     end)
 end
 
 MinimizeButton.MouseButton1Click:Connect(function()
     ContentFrame.Visible = not ContentFrame.Visible
-    MainFrame.Size = ContentFrame.Visible and UDim2.new(0, 420, 0, 480) or UDim2.new(0, 420, 0, 35)
+    MainFrame.Size = ContentFrame.Visible and UDim2.new(0, 420, 0, 500) or UDim2.new(0, 420, 0, 35)
 end)
 
 CloseButton.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
--- Training Functions
+-- Helper Functions
 local function FormatNumber(num)
     if num >= 1e12 then
         return string.format("%.2fT", num / 1e12)
@@ -324,93 +323,160 @@ local function FormatNumber(num)
     end
 end
 
-local function UseBuffItem()
-    if not Config.UseBuffItems then return end
-    
+-- Use Buff Item Function
+local function UseBuffItem(itemId)
     pcall(function()
-        local TryOperatingItemByPlayer = ReplicatedStorage.PlayerItemBackpack.Remote.TryOperatingItemByPlayer
-        TryOperatingItemByPlayer:InvokeServer(
-            {
-                GridInfo = {Id = 21, Num = 1},
-                GridIndex = "401"
-            },
-            21, 1,
-            {Operation = "UseItem", PointingOperation = "UseSingleBuffConsum"}
-        )
-    end)
-end
-
-local function TrainElement(elementType)
-    pcall(function()
-        local TrainSpeedHasChanged = ReplicatedStorage.TrainSystem.Remote.TrainSpeedHasChanged
-        local StatisticsDataHasChanged = ReplicatedStorage.Statistics.Remote.StatisticsDataHasChanged
+        local TryOperatingItemByPlayer = ReplicatedStorage:FindFirstChild("PlayerItemBackpack")
+            and ReplicatedStorage.PlayerItemBackpack:FindFirstChild("Remote")
+            and ReplicatedStorage.PlayerItemBackpack.Remote:FindFirstChild("TryOperatingItemByPlayer")
         
-        -- Simulate extreme training dengan multiplier
-        local baseValue = 18 * Config.Multiplier
+        if TryOperatingItemByPlayer then
+            TryOperatingItemByPlayer:InvokeServer(
+                {
+                    GridInfo = {Id = itemId, Num = 1},
+                    GridIndex = "401"
+                },
+                itemId,
+                1,
+                {Operation = "UseItem", PointingOperation = "UseSingleBuffConsum"}
+            )
+        end
+    end)
+end
+
+-- Training Functions
+local function GetCurrentTrainValue(trainType)
+    local success, value = pcall(function()
+        local GetTrainValue = ReplicatedStorage:FindFirstChild("TrainSystem")
+            and ReplicatedStorage.TrainSystem:FindFirstChild("Bindable")
+            and ReplicatedStorage.TrainSystem.Bindable:FindFirstChild("GetTrainValue")
         
-        -- Fire training dengan nilai yang sudah dimultiplier
-        TrainSpeedHasChanged:FireServer(elementType)
+        if GetTrainValue then
+            return GetTrainValue:Invoke(LocalPlayer, trainType)
+        end
+        return 0
+    end)
+    return success and value or 0
+end
+
+local function SetTrainValue(trainType, newValue, oldValue)
+    pcall(function()
+        -- Fire ke BindableEvent dulu
+        local PlayerTrainValueHasChanged = ReplicatedStorage:FindFirstChild("TrainSystem")
+            and ReplicatedStorage.TrainSystem:FindFirstChild("Bindable")
+            and ReplicatedStorage.TrainSystem.Bindable:FindFirstChild("PlayerTrainValueHasChanged")
         
-        -- Update statistics dengan nilai ekstrem
-        wait(0.05)
-        StatisticsDataHasChanged:FireServer(baseValue, elementType)
+        if PlayerTrainValueHasChanged then
+            PlayerTrainValueHasChanged:Fire(LocalPlayer, trainType, newValue, oldValue)
+        end
     end)
 end
 
-local function ApplyMobileTraining()
+local function FireTrainingSpeed(elementType)
     pcall(function()
-        local ApplyMobileTrain = ReplicatedStorage.TrainEquipment.Remote.ApplyMobileTrain
-        ApplyMobileTrain:InvokeServer()
+        local TrainSpeedHasChanged = ReplicatedStorage:FindFirstChild("TrainSystem")
+            and ReplicatedStorage.TrainSystem:FindFirstChild("Remote")
+            and ReplicatedStorage.TrainSystem.Remote:FindFirstChild("TrainSpeedHasChanged")
+        
+        if TrainSpeedHasChanged then
+            TrainSpeedHasChanged:FireServer(elementType)
+        end
     end)
 end
 
-local function ApplyStationaryTraining()
+local function ApplyTrainingMethods()
     pcall(function()
-        local ApplyStationaryTrain = ReplicatedStorage.TrainEquipment.Remote.ApplyStationaryTrain
-        ApplyStationaryTrain:InvokeServer()
+        -- Apply Mobile Train
+        local ApplyMobileTrain = ReplicatedStorage:FindFirstChild("TrainEquipment")
+            and ReplicatedStorage.TrainEquipment:FindFirstChild("Remote")
+            and ReplicatedStorage.TrainEquipment.Remote:FindFirstChild("ApplyMobileTrain")
+        
+        if ApplyMobileTrain then
+            ApplyMobileTrain:InvokeServer()
+        end
+        
+        -- Apply Stationary Train
+        local ApplyStationaryTrain = ReplicatedStorage:FindFirstChild("TrainEquipment")
+            and ReplicatedStorage.TrainEquipment:FindFirstChild("Remote")
+            and ReplicatedStorage.TrainEquipment.Remote:FindFirstChild("ApplyStationaryTrain")
+        
+        if ApplyStationaryTrain then
+            ApplyStationaryTrain:InvokeServer()
+        end
     end)
 end
-
-local lastBuffTime = 0
-local trainingLoop
 
 -- Main Training Loop
-trainingLoop = RunService.Heartbeat:Connect(function()
-    if not Config.AutoTrain then return end
-    
-    -- Use buff setiap 10 detik
-    if tick() - lastBuffTime > 10 then
-        UseBuffItem()
-        lastBuffTime = tick()
-    end
-    
-    -- Train semua element yang aktif secara bergantian
-    for key, enabled in pairs(Config.Elements) do
-        if enabled then
-            local elementID = key == "Arms" and 1 or key == "Legs" and 2 or key == "Back" and 3 or 4
-            TrainElement(elementID)
-            wait(Config.TrainSpeed)
+local lastBuffTime = {}
+local trainingActive = false
+
+spawn(function()
+    while wait(Config.TrainSpeed) do
+        if Config.AutoTrain and not trainingActive then
+            trainingActive = true
+            
+            -- Train each enabled element
+            for key, element in pairs(Config.Elements) do
+                if element.enabled then
+                    local elementType = key == "Arms" and 1 or key == "Legs" and 2 or key == "Back" and 3 or 4
+                    
+                    -- Use buff item if enabled (setiap 15 detik per element)
+                    if Config.UseBuffItems then
+                        if not lastBuffTime[key] or (tick() - lastBuffTime[key]) > 15 then
+                            UseBuffItem(element.itemId)
+                            lastBuffTime[key] = tick()
+                        end
+                    end
+                    
+                    -- Get current value
+                    local currentValue = GetCurrentTrainValue(elementType)
+                    
+                    -- Calculate new value dengan multiplier
+                    local baseIncrease = 18 -- Base training value
+                    local increase = baseIncrease * Config.Multiplier
+                    local newValue = currentValue + increase
+                    
+                    -- Set new training value
+                    SetTrainValue(elementType, newValue, currentValue)
+                    
+                    -- Fire training speed
+                    FireTrainingSpeed(elementType)
+                    
+                    wait(0.02)
+                end
+            end
+            
+            -- Apply training methods
+            ApplyTrainingMethods()
+            
+            trainingActive = false
         end
     end
-    
-    -- Apply training methods
-    ApplyMobileTraining()
-    ApplyStationaryTraining()
 end)
 
 -- Update Combat Power Display
 spawn(function()
     while wait(0.5) do
         pcall(function()
-            local GetCombatPower = ReplicatedStorage.TrainSystem.Bindable.GetCombatPower
-            local combatPower = GetCombatPower:Invoke(LocalPlayer)
-            if combatPower then
-                CombatPowerLabel.Text = "💪 Combat Power: " .. FormatNumber(combatPower)
+            local GetCombatPower = ReplicatedStorage:FindFirstChild("TrainSystem")
+                and ReplicatedStorage.TrainSystem:FindFirstChild("Bindable")
+                and ReplicatedStorage.TrainSystem.Bindable:FindFirstChild("GetCombatPower")
+            
+            if GetCombatPower then
+                local combatPower = GetCombatPower:Invoke(LocalPlayer)
+                if combatPower then
+                    CombatPowerLabel.Text = "💪 Combat Power: " .. FormatNumber(combatPower)
+                end
             end
         end)
     end
 end)
 
-print("✅ Extreme Combat Trainer loaded! Combat Power akan meningkat drastis!")
-print("⚡ Multiplier range: 1M - 1T per training!")
-print("🎯 Target: Ratusan juta hingga triliun+ Combat Power")
+print("✅ Extreme Combat Trainer V2 Loaded!")
+print("📌 Item Buffs:")
+print("   - Arms: Item18")
+print("   - Back: Item19")
+print("   - Legs: Item20")
+print("   - Agility: Item21")
+print("⚡ Multiplier: 1M - 1T per training!")
+print("🎯 Target: Ratusan juta - triliun+ Combat Power")
